@@ -76,3 +76,39 @@ Docker Compose v2+
 
 17. Embedding Model
 all-MiniLM-L6-v2
+
+//FILE STRUCTURE
+
+cloud-incident-copilot/
+│
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── middleware/
+│   │   └── utils/
+│   │
+│   ├── server.js
+│   ├── package.json
+│   └── .env
+│
+├── log-processor/
+│   ├── classifier.py
+│   ├── preprocess.py
+│   ├── main.py
+│   ├── requirements.txt
+│   └── .env
+│
+├── frontend/
+│
+├── docker/
+│   └── app/
+│       ├── Dockerfile
+│       └── app/
+│
+├── logs/
+│
+├── docker-compose.yml
+│
+└── README.md
