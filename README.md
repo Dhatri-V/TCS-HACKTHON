@@ -1,5 +1,9 @@
 # TCS-HACKTHON
 
+For the tested local presentation sequence, use [DEMO.md](DEMO.md) and
+`./scripts/demo.sh`. It starts the existing infrastructure, backend, frontend,
+log watcher, and investigation pipeline without changing remediation safety.
+
 //TECH STACKS
 | Part                           | Technology                               |
 | ------------------------------ | ---------------------------------------- |
