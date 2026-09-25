@@ -1,0 +1,10 @@
+.env
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+failed_incidents/
+dist/
+.vite/
