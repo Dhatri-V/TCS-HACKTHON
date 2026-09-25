@@ -1,0 +1,16 @@
+[
+  {
+    "incident_id": "INC-101",
+    "current_incident": "orders-api cannot connect to its database",
+    "logs": [{"id": "LOG-1", "text": "ECONNREFUSED db:5432"}],
+    "system_context": [{"id": "CTX-1", "text": "orders-api uses PostgreSQL at db:5432"}],
+    "similar_incidents": [{"id": "HIST-42", "text": "Synthetic historical incident: PostgreSQL was stopped. Restoring it recovered connections. This cause was verified for that past incident only."}]
+  },
+  {
+    "incident_id": "INC-102",
+    "current_incident": "A request failed; no details available",
+    "logs": [],
+    "system_context": [],
+    "similar_incidents": []
+  }
+]
