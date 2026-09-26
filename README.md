@@ -14,14 +14,14 @@ log watcher, and investigation pipeline without changing remediation safety.
 | Error classification           | Python + scikit-learn                  |
 | AI model                       | Qwen2.5                                |
 | Model runtime                  | Ollama                                 |
-| RAG                            | LangChain                              |
+| RAG                            | qwen 3                             |
 | Embeddings                     | Hugging Face / sentence-transformers   |
-| Vector DB                      | ChromaDB                               |
+| Vector DB                      | FAISS                              |
 | Main DB                        | MongoDB Atlas                          |
-| Frontend                       | React / Next.js                        |
-| API communication              | REST API / Axios                       |
+| Frontend                       | React /                        |
+| API communication              | REST API / Axios /FASTAPI                      |
 | Containerization               | Docker + Docker Compose                |
-| Cloud deployment               | AWS** or another cloud provider        |
+
 
 1. Backend
 Node.js — 22 LTS
@@ -43,15 +43,25 @@ Sentence Transformers — 3.3.1
 
 
 5. RAG
-LangChain — 0.3.14
-LangChain Community — 0.3.14
-LangChain Chroma — 0.2.0
-ChromaDB — 0.5.23
+| RAG component        | Your implementation     |
+| -------------------- | ----------------------- |
+| Document loading     | PyMuPDF / JSON / Python |
+| Chunking             | Custom Python logic     |
+| Embeddings           | BGE-M3                  |
+| Vector database      | FAISS                   |
+| Similarity search    | FAISS top-K search      |
+| Retrieval            | Custom Python           |
+| Context construction | Custom Python           |
+| LLM                  | Qwen 3   via Ollama     |
+| Output format        | Structured JSON         |
+| API/orchestration    | FastAPI                 |
+
 
 
 7. LLM
 Ollama
 Qwen2.5 3B
+Qwen3 4B
 
 
 9. AI API
@@ -79,7 +89,7 @@ Docker Compose v2+
 
 
 17. Embedding Model
-all-MiniLM-L6-v2
+BGE-M3
 
 //FILE STRUCTURE
 
@@ -116,3 +126,56 @@ cloud-incident-copilot/
 ├── docker-compose.yml
 │
 └── README.md
+
+//RAG 
+incident-investigator/
+│
+├── app/
+│   ├── main.py                  # FastAPI entry point
+│   │
+│   ├── api/
+│   │   └── routes.py            # API endpoints
+│   │
+│   ├── rag/
+│   │   ├── ingest.py            # Load + chunk incident documents
+│   │   ├── embedder.py          # BGE-M3 embeddings
+│   │   ├── vector_store.py      # FAISS index operations
+│   │   ├── retriever.py         # Similar incident retrieval
+│   │   ├── context.py           # Build LLM context
+│   │   └── pipeline.py          # Complete RAG pipeline
+│   │
+│   ├── llm/
+│   │   └── qwen.py              # Qwen 3 / Ollama communication
+│   │
+│   ├── schemas/
+│   │   └── incident.py          # Pydantic request/response models
+│   │
+│   └── utils/
+│       └── chunking.py           # Chunking utilities
+│
+├── data/
+│   ├── incidents/               # Historical incident documents
+│   │   ├── incident_001.json
+│   │   ├── incident_002.json
+│   │   └── ...
+│   │
+│   └── runbooks/                # Historical runbooks
+│       ├── database_failure.pdf
+│       ├── pod_crash.pdf
+│       └── ...
+│
+├── vector_db/
+│   ├── faiss.index              # FAISS vector index
+│   └── metadata.json            # Maps vector → original document/chunk
+│
+├── tests/
+│   ├── test_ingest.py
+│   ├── test_retrieval.py
+│   └── test_pipeline.py
+│
+├── requirements.txt
+├── .gitignore
+├── README.md
+└── .env
+
+
