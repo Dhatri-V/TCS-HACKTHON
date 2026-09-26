@@ -1,0 +1,4 @@
+2026-09-26 10:32:14 ERROR payment-api Database connection timeout
+2026-09-26 10:32:15 ERROR payment-api Request failed with status 503
+2026-09-26 10:32:16 WARN payment-api High latency detected
+2026-09-26 10:32:17 ERROR payment-api Request timeout

@@ -1,0 +1,12 @@
+Service: payment-api
+
+Symptoms:
+High CPU usage
+Request latency increased
+Pods restarted repeatedly
+
+Root Cause:
+CPU saturation caused by an inefficient query
+
+Resolution:
+Optimized the query and increased CPU resources temporarily.

@@ -1,0 +1,12 @@
+Service: payment-api
+
+Symptoms:
+503 errors
+Latency increased
+Database connections at 100%
+
+Root Cause:
+Connection pool exhaustion
+
+Resolution:
+Increased connection pool size and restarted affected pods.
