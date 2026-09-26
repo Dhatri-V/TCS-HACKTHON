@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { remediationRequest } from "../services/api.js";
-export default function RemediationPanel({ incident, onRefresh }) {
+export function remediationNotification(state) {
+  if (state === "PENDING_APPROVAL") return ["Recovery proposal is ready for human approval.", "success"];
+  if (state === "RESOLVED") return ["PostgreSQL recovery verified; incident resolved.", "success"];
+  if (state === "REJECTED") return ["Recovery proposal rejected.", "success"];
+  if (state === "BLOCKED") return ["Readiness checks remain incomplete.", "warning"];
+  return ["Recovery workflow updated.", "success"];
+}
+export default function RemediationPanel({ incident, onRefresh, onNotify }) {
   const [token, setToken] = useState("");
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -20,8 +27,9 @@ export default function RemediationPanel({ incident, onRefresh }) {
         });
         setResult(next);
       }
+      onNotify?.(...remediationNotification(next.state));
       setToken(""); setReviewed(false); onRefresh?.();
-    } catch (e) { setError(e.message); }
+    } catch (e) { setError(e.message); onNotify?.(e.message, "error"); }
     finally { setBusy(false); }
   };
   const pending = result?.state === "PENDING_APPROVAL";

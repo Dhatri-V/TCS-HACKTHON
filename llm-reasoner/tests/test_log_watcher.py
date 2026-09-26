@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock
 
+from llm_reasoner.delivery_outbox import DeliveryOutbox
 from llm_reasoner.log_watcher import process_log_line, watch_docker_logs
 
 ENTRY = dict(timestamp='2026-09-25T10:00:00.123Z', level='error',
@@ -71,4 +72,5 @@ def test_docker_watcher_follows_only_new_logs_and_stops_after_incident(tmp_path)
     assert process.command[:4]==['docker','compose','-f',str(compose.resolve())]
     assert '--follow' in process.command and '--since' in process.command
     assert process.command[-1]=='orders-api'
-    assert calls[1][1]=={'api_base':'http://api','demo':True}
+    assert calls[1][1]['api_base']=='http://api' and calls[1][1]['demo'] is True
+    assert isinstance(calls[1][1]['outbox'], DeliveryOutbox)

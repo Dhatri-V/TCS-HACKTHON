@@ -7,6 +7,19 @@ export class ApiError extends Error {
 }
 export function errorHandler(error, req, res, next) {
   if (res.headersSent) return next(error);
+  const status = error instanceof ApiError ? error.status
+    : error.code === 11000 ? 409
+      : error.type === "entity.too.large" ? 413
+        : error.type === "entity.parse.failed" || ["ValidationError", "CastError", "StrictModeError"].includes(error.name) ? 400
+          : /Mongo|MongooseServerSelection/.test(error.name) ? 503 : 500;
+  const code = error instanceof ApiError ? error.code
+    : error.code === 11000 ? "INCIDENT_EXISTS"
+      : error.type === "entity.too.large" ? "BODY_TOO_LARGE"
+        : status === 400 ? "INVALID_REQUEST"
+          : status === 503 ? "DATABASE_UNAVAILABLE" : "INTERNAL_ERROR";
+  operationalLog(status >= 500 ? "error" : "warn", "request_failed", {
+    method: req.method, status_code: status, error_code: code,
+  });
   if (error instanceof ApiError)
     return res
       .status(error.status)
@@ -54,3 +67,4 @@ export function errorHandler(error, req, res, next) {
       error: { code: "INTERNAL_ERROR", message: "Unexpected server error" },
     });
 }
+import { operationalLog } from "../utils/logger.js";

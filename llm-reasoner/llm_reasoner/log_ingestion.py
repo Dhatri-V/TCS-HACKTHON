@@ -74,6 +74,9 @@ def publish_incident(incident: dict, api_base: str = 'http://localhost:3000') ->
                 fields = ('incident_id', 'timestamp', 'service', 'log_level', 'message', 'classification')
                 if all(value.get(k) == incident[k] for k in fields):
                     return 'already_delivered'
+            raise IngestionError('incident_conflict')
+        if 400 <= response.status_code < 500:
+            raise IngestionError('delivery_rejected')
         raise IngestionError('delivery_failed')
     except (requests.RequestException, ValueError) as error:
         if isinstance(error, IngestionError):

@@ -75,7 +75,11 @@ try {
   const diagnosed=await api('');
   assert.equal(diagnosed.status,200);assert.equal(diagnosed.body.status,'DIAGNOSED');
   assert.ok(['completed','insufficient_evidence'].includes(diagnosed.body.analysis.status));
-  assert.match(diagnosed.body.analysis.explanation,/PostgreSQL container.*stopped/);
+  assert.ok(diagnosed.body.analysis.references.length > 0);
+  assert.ok(diagnosed.body.analysis.grounded_claims.some(claim =>
+    claim.source === 'logs' && /PostgreSQL connection failed/.test(claim.text)));
+  if(diagnosed.body.analysis.status==='completed')
+    assert.match(diagnosed.body.analysis.explanation,/PostgreSQL container.*stopped/);
   summary.diagnosis={status:diagnosed.body.status,reasoning_status:diagnosed.body.analysis.status,
     root_cause:diagnosed.body.analysis.probable_root_cause,
     explanation:diagnosed.body.analysis.explanation,missing:diagnosed.body.analysis.missing_information};

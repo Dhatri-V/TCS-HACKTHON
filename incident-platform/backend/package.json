@@ -12,10 +12,11 @@
     "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "mongoose": "^8.9.5",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7"
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "mongodb-memory-server": "^10.2.0",

@@ -13,7 +13,7 @@ function Items({ title, values }) {
     </section>
   ) : null;
 }
-export default function IncidentDetail({ incident, onRefresh }) {
+export default function IncidentDetail({ incident, onRefresh, onNotify }) {
   const a = incident.analysis;
   return (
     <article className="detail">
@@ -51,7 +51,7 @@ export default function IncidentDetail({ incident, onRefresh }) {
         <h3>Error message</h3>
         <p className="log-message">{incident.message}</p>
       </section>
-      <RemediationPanel key={incident.incident_id} incident={incident} onRefresh={onRefresh} />
+      <RemediationPanel key={incident.incident_id} incident={incident} onRefresh={onRefresh} onNotify={onNotify} />
       {!a ? (
         <div className="empty analysis-empty">
           <h3>

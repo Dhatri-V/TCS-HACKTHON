@@ -24,3 +24,4 @@ async function get(path, signal) {
 export const listIncidents = (signal) => get("/api/incidents", signal);
 export const getIncident = (id, signal) =>
   get(`/api/incidents/${encodeURIComponent(id)}`, signal);
+export const getHealth = (signal) => get("/health", signal);

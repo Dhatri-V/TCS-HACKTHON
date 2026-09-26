@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { getIncident, listIncidents } from "./services/api.js";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { getHealth, getIncident, listIncidents } from "./services/api.js";
 import IncidentList from "./components/IncidentList.jsx";
 import IncidentDetail from "./components/IncidentDetail.jsx";
+import BackendStatus from "./components/BackendStatus.jsx";
+import { ToastContainer } from "./components/Toast.jsx";
 export default function App() {
   const [incidents, setIncidents] = useState([]),
     [selected, setSelected] = useState(null);
@@ -11,6 +13,30 @@ export default function App() {
   const [error, setError] = useState(""),
     [detailError, setDetailError] = useState(""),
     [revision, setRevision] = useState(0);
+  const [backendOnline, setBackendOnline] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const nextToastId = useRef(0);
+  const notify = useCallback((message, tone = "info") => {
+    const id = ++nextToastId.current;
+    setToasts(items => [...items, { id, message, tone }]);
+  }, []);
+  const dismissToast = useCallback(id => {
+    setToasts(items => items.filter(item => item.id !== id));
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      try {
+        const health = await getHealth();
+        if (active) setBackendOnline(health.status === "healthy" && health.backend === "up");
+      } catch {
+        if (active) setBackendOnline(false);
+      }
+    };
+    check();
+    const timer = setInterval(check, 10000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -25,13 +51,13 @@ export default function App() {
         );
       })
       .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
+        if (!controller.signal.aborted) { setError(e.message); notify(e.message, "error"); }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [revision]);
+  }, [revision, notify]);
   useEffect(() => {
     const controller = new AbortController();
     setDetail(null);
@@ -44,13 +70,13 @@ export default function App() {
     getIncident(selected, controller.signal)
       .then(setDetail)
       .catch((e) => {
-        if (!controller.signal.aborted) setDetailError(e.message);
+        if (!controller.signal.aborted) { setDetailError(e.message); notify(e.message, "error"); }
       })
       .finally(() => {
         if (!controller.signal.aborted) setDetailLoading(false);
       });
     return () => controller.abort();
-  }, [selected, revision]);
+  }, [selected, revision, notify]);
   const open = incidents.filter(
     (i) => !["RESOLVED", "FAILED"].includes(i.status),
   ).length;
@@ -63,7 +89,10 @@ export default function App() {
             Cloud Incident Copilot<small>OPERATIONS CONSOLE</small>
           </div>
         </div>
-        <span className="workspace">LOCAL WORKSPACE</span>
+        <div className="header-status">
+          <BackendStatus online={backendOnline} />
+          <span className="workspace">LOCAL WORKSPACE</span>
+        </div>
       </header>
       <div className="page-heading">
         <div>
@@ -145,7 +174,7 @@ export default function App() {
               {detailError}
             </p>
           ) : (
-            detail && <IncidentDetail incident={detail} onRefresh={() => setRevision((v) => v + 1)} />
+            detail && <IncidentDetail incident={detail} onRefresh={() => setRevision((v) => v + 1)} onNotify={notify} />
           )}
         </section>
       )}
@@ -153,6 +182,7 @@ export default function App() {
         Cloud Incident Copilot{" "}
         <span>Human-approved demo recovery · Agent integration via REST</span>
       </footer>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }
