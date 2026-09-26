@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-reasoner"
+version = "0.1.0"
+description = "Incident reasoning over context already prepared by the RAG team"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pydantic==2.13.5",
+    "litellm==1.102.1",
+    "langgraph==0.2.76",
+    # Transitive compatibility bound for the README LangChain 0.3.14 stack.
+    "langchain-core>=0.3.29,<0.4",
+    # Existing architecture pins; these are also LiteLLM transitive dependencies.
+    "python-dotenv==1.0.1",
+    "requests==2.32.3",
+    "chromadb==1.5.9",
+    "sentence-transformers==6.1.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["llm_reasoner*"]
+
+[tool.setuptools.package-data]
+llm_reasoner = ["data/*.json"]
