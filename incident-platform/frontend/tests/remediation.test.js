@@ -6,6 +6,10 @@ import { createServer } from 'vite';
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
 after(() => server.close());
 const { default: Panel } = await server.ssrLoadModule('/src/components/RemediationPanel.jsx');
+const { remediationNotification } = await server.ssrLoadModule('/src/components/RemediationPanel.jsx');
+const { default: BackendStatus } = await server.ssrLoadModule('/src/components/BackendStatus.jsx');
+const { Toast } = await server.ssrLoadModule('/src/components/Toast.jsx');
+const { createHealthCheckRunner } = await server.ssrLoadModule('/src/App.jsx');
 const incident = { incident_id:'INC-DEMO-001',service:'orders-api',status:'DIAGNOSED',analysis:{} };
 const render = changes => renderToStaticMarkup(React.createElement(Panel,{incident:{...incident,...changes}}));
 test('diagnosed incident offers authenticated proposal, not direct execution',()=>{
@@ -47,4 +51,37 @@ test('approval API sends only the bound decision to backend',async()=>{
     assert.equal(call[1].method,'POST');assert.deepEqual(JSON.parse(call[1].body),body);
     assert.equal(call[1].headers.Authorization,'Bearer test-only-token');
   }finally{globalThis.fetch=original;}
+});
+test('health API uses the existing backend health endpoint',async()=>{
+  const { getHealth }=await server.ssrLoadModule('/src/services/api.js');
+  const original=globalThis.fetch;let target;
+  globalThis.fetch=async url=>{target=url;return {ok:true,json:async()=>({status:'healthy',backend:'up',database:'connected'})};};
+  try {
+    assert.deepEqual(await getHealth(),{status:'healthy',backend:'up',database:'connected'});
+    assert.match(target,/\/health$/);
+  }finally{globalThis.fetch=original;}
+});
+test('backend status renders checking, online and offline states',()=>{
+  const renderStatus=online=>renderToStaticMarkup(React.createElement(BackendStatus,{online}));
+  assert.match(renderStatus(null),/Checking backend/);
+  assert.match(renderStatus(true),/backend-online.*Backend online/);
+  assert.match(renderStatus(false),/backend-offline.*Backend offline/);
+});
+test('an older health response cannot overwrite a newer result',async()=>{
+  const pending=[];const results=[];
+  const load=signal=>new Promise((resolve,reject)=>pending.push({resolve,reject,signal}));
+  const runner=createHealthCheckRunner({load,onResult:value=>results.push(value)});
+  const older=runner.run();const newer=runner.run();
+  assert.equal(pending[0].signal.aborted,true);
+  pending[1].resolve({status:'unhealthy',backend:'up'});await newer;
+  pending[0].resolve({status:'healthy',backend:'up'});await older;
+  assert.deepEqual(results,[false]);
+  runner.stop();
+});
+test('toast is accessible and remediation outcomes map to useful notifications',()=>{
+  const html=renderToStaticMarkup(React.createElement(Toast,{id:1,message:'Saved',tone:'success',onDismiss:()=>{}}));
+  assert.match(html,/role="status"/);assert.match(html,/Dismiss notification/);assert.match(html,/Saved/);
+  assert.deepEqual(remediationNotification('PENDING_APPROVAL'),['Recovery proposal is ready for human approval.','success']);
+  assert.deepEqual(remediationNotification('BLOCKED'),['Readiness checks remain incomplete.','warning']);
+  assert.deepEqual(remediationNotification('RESOLVED'),['PostgreSQL recovery verified; incident resolved.','success']);
 });

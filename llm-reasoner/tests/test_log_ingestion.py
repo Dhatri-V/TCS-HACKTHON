@@ -39,4 +39,25 @@ def test_retry_never_overwrites_progress_and_conflicts_fail():
     with patch('requests.post',return_value=Mock(status_code=409)),patch('requests.get',return_value=Mock(status_code=200,json=lambda:{**value,'status':'RESOLVED'})):
         assert publish_incident(value)=='already_delivered'
     with patch('requests.post',return_value=Mock(status_code=409)),patch('requests.get',return_value=Mock(status_code=200,json=lambda:{**value,'message':'Different event'})):
-        with pytest.raises(IngestionError): publish_incident(value)
+        with pytest.raises(IngestionError,match='incident_conflict'): publish_incident(value)
+
+@pytest.mark.parametrize('status',[408,429,500,503])
+def test_transient_post_failures_remain_retryable(status):
+    with patch('requests.post',return_value=Mock(status_code=status)):
+        with pytest.raises(IngestionError,match='delivery_failed'):
+            publish_incident(incident_from_line(line()))
+
+@pytest.mark.parametrize('status',[408,429,500,503])
+def test_transient_409_lookup_failures_remain_retryable(status):
+    value=incident_from_line(line())
+    with patch('requests.post',return_value=Mock(status_code=409)),patch(
+            'requests.get',return_value=Mock(status_code=status)):
+        with pytest.raises(IngestionError,match='delivery_failed'):
+            publish_incident(value)
+
+def test_permanent_409_lookup_rejection_is_not_retryable():
+    value=incident_from_line(line())
+    with patch('requests.post',return_value=Mock(status_code=409)),patch(
+            'requests.get',return_value=Mock(status_code=403)):
+        with pytest.raises(IngestionError,match='delivery_rejected'):
+            publish_incident(value)

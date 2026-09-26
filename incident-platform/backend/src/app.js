@@ -5,11 +5,21 @@ import incidents from "./routes/incidents.js";
 import { remediationRoutes } from "./routes/remediation.js";
 import { databaseHealthy } from "./config/database.js";
 import { ApiError, errorHandler } from "./middleware/errors.js";
+import { operationalLog } from "./utils/logger.js";
 export function createApp({ frontendOrigin = "http://localhost:5173", remediation = {} } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use(cors({ origin: frontendOrigin }));
   app.use(express.json({ limit: "256kb" }));
+  app.use((req, res, next) => {
+    const started = Date.now();
+    res.once("finish", () => operationalLog(
+      res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info",
+      "request_completed",
+      { method: req.method, status_code: res.statusCode, duration_ms: Date.now() - started },
+    ));
+    next();
+  });
   app.get("/health", async (req, res) => {
     const healthy = await databaseHealthy();
     res

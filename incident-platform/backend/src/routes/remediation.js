@@ -3,6 +3,7 @@ import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import { Incident } from "../models/Incident.js";
 import { ApiError } from "../middleware/errors.js";
 import { remediationWorker } from "../services/remediationWorker.js";
+import { operationalLog } from "../utils/logger.js";
 
 const fail = (status, code, message) => { throw new ApiError(status, code, message); };
 const exact = (body, names) => body && typeof body === "object" && !Array.isArray(body)
@@ -75,6 +76,9 @@ export function remediationRoutes({ worker = remediationWorker, operatorToken = 
     const remediation = { ...result, action_id: actionId, created_at: reserved.remediation.created_at };
     await Incident.updateOne({ incident_id: req.params.id, "remediation.action_id": actionId, "remediation.state": "PREPARING" },
       { $set: { remediation, status: "DIAGNOSED" } });
+    operationalLog("info", "remediation_proposal_prepared", {
+      incident_id: incident.incident_id, remediation_state: remediation.state,
+    });
     res.status(201).json(remediation);
   });
   router.post("/:id/remediation/readiness", async (req, res) => {
@@ -118,6 +122,9 @@ export function remediationRoutes({ worker = remediationWorker, operatorToken = 
         { $set: { remediation, status: result.state === "PENDING_APPROVAL" ? "PENDING_APPROVAL" : "DIAGNOSED" } },
         { new: true });
       if (!saved) throw new Error();
+      operationalLog("info", "remediation_readiness_checked", {
+        incident_id: incident.incident_id, remediation_state: result.state,
+      });
       return res.json(publicState(saved));
     } catch {
       await Incident.updateOne({ incident_id: req.params.id,
@@ -153,6 +160,9 @@ export function remediationRoutes({ worker = remediationWorker, operatorToken = 
         "remediation.action.executable": false },
         $push: { "remediation.history": { $each: rejected ? ["REJECTED"] : ["APPROVED", "EXECUTING"] } } }, { new: true });
     if (!reserved) fail(409, "ALREADY_DECIDED", "This action has already been decided.");
+    operationalLog("info", "remediation_decision_recorded", {
+      incident_id: incident.incident_id, remediation_state: rejected ? "REJECTED" : "EXECUTING",
+    });
     if (rejected) return res.json(publicState(reserved));
     let result;
     try {
@@ -166,6 +176,9 @@ export function remediationRoutes({ worker = remediationWorker, operatorToken = 
             $push: { "remediation.history": "VERIFYING" } });
         if (saved.modifiedCount !== 1) throw new Error();
         verifying = true;
+        operationalLog("info", "remediation_verification_started", {
+          incident_id: incident.incident_id, remediation_state: "VERIFYING",
+        });
       });
       const verified = verifying && result.state === "RESOLVED" && result.execution?.status === "succeeded"
         && result.execution.action_id === prior.action_id && result.execution.service === "postgres"
@@ -178,6 +191,9 @@ export function remediationRoutes({ worker = remediationWorker, operatorToken = 
         action_id: prior.action_id, attempt_reserved: true, finished_at: new Date().toISOString() };
       await Incident.updateOne({ incident_id: req.params.id, "remediation.action_id": prior.action_id, "remediation.state": { $in: ["EXECUTING", "VERIFYING"] } },
         { $set: { remediation, status: verified ? "RESOLVED" : "FAILED" } });
+      operationalLog(verified ? "info" : "error", "remediation_finished", {
+        incident_id: incident.incident_id, remediation_state: verified ? "RESOLVED" : "FAILED",
+      });
       return res.json(remediation);
     } catch {
       await Incident.updateOne({ incident_id: req.params.id, "remediation.action_id": prior.action_id, "remediation.state": { $in: ["EXECUTING", "VERIFYING"] } },
