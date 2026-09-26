@@ -41,6 +41,8 @@ volumes are retained.
 
 `start` verifies Docker, dependencies, MongoDB configuration, the operator token,
 Ollama, backend health, frontend health, and the exact healthy orders-api JSON.
+It idempotently indexes four curated, verified historical resolutions in the
+local Chroma knowledge base before starting the watcher.
 It refuses to begin if the fixed demo incident already exists or either web port
 is owned by another process. Logs and PID files are kept outside the repository
 under the system temporary directory.
@@ -68,6 +70,6 @@ tail -f "${TMPDIR:-/tmp}/tcs-hackathon-demo-${UID}/backend.log"
 ./scripts/demo.sh stop
 ```
 
-`stop` retains the MongoDB record and PostgreSQL volume. Run `reset` before the
-next complete presentation. RAG remains optional and is not configured or
-implemented by these scripts.
+`stop` retains the MongoDB record, PostgreSQL volume, and local Chroma index. Run
+`reset` before the next complete presentation. Historical retrieval remains an
+agent-selected tool; Qwen may finalize or call other tools without using it.

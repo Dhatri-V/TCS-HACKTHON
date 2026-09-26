@@ -1,6 +1,9 @@
 # LLM reasoner
 
-Python 3.11 module for architecture box 5 only: prepared incident context → LiteLLM → local Qwen2.5 3B through Ollama → validated analysis. Gemini is the backup for provider-call failures. No retrieval implementation, databases or HTTP server. An optional bounded investigation agent is described below.
+Python 3.11 investigation module: prepared incident context and agent-selected
+read-only tools → LiteLLM → local Qwen2.5 3B through Ollama → validated analysis.
+The historical tool uses local MiniLM embeddings and ChromaDB. Gemini remains the
+backup for provider-call failures; no separate HTTP service is introduced.
 
 ## Setup
 
@@ -36,13 +39,44 @@ result = analyze_incident({
 json_payload = result.model_dump()
 ```
 
-`incident_id` and `current_incident` are required nonempty strings. The three evidence lists default to empty. Each record is `{id, text}`; IDs must be unique across all lists. The RAG owner supplies selected historical descriptions, verified causes and outcomes in `text`. Supply timestamps, service/version and applicability details in the evidence text when available. Put facts needing citations in these lists. Send redacted context; the serialized input limit is 60,000 characters, with explicit rejection rather than silent truncation.
+`incident_id` and `current_incident` are required nonempty strings. The three evidence lists default to empty. Each record is `{id, text}`; IDs must be unique across all lists. The Chroma adapter supplies selected historical descriptions, verified causes and outcomes in `text`. Supply timestamps, service/version and applicability details in the evidence text when available. Put facts needing citations in these lists. Send redacted context; the serialized input limit is 60,000 characters, with explicit rejection rather than silent truncation.
 
 Output contains `incident_id`, `status`, `probable_root_cause`, `explanation`, `remediation_steps`, `configuration_changes`, `references`, `missing_information`, `grounded_claims`, and application-owned `remediation_metadata`. Steps, changes, references and missing information are lists of strings. Status is `completed` or `insufficient_evidence`; the latter requires a null cause. Configuration changes may be empty. Explanation should connect claims to IDs in references. Natural-language recommendations are never executed directly; the separate controlled workflow accepts only trusted typed proposals.
 
 The module copies incident identity itself. Final explanations quote selected source records with application-owned references; see the grounding contract below. Source provenance does not establish source truth or prove causality.
 
-Planned integration: the Python RAG pipeline can import `analyze_incident` after retrieval, and its caller can return `result.model_dump()` to Express. Those teammate services and their wiring are not implemented here. The function is synchronous; an async host should run it outside its event loop. No separate FastAPI service is included.
+The retrieval adapter is synchronous, like the existing Docker adapters; an async
+host should run investigation outside its event loop. No separate FastAPI service
+is included.
+
+## Verified historical retrieval
+
+The curated demo data is in `llm_reasoner/data/historical_incidents.json`. Only
+records with `status=RESOLVED`, remediation `state=RESOLVED`, successful execution,
+and healthy verification are indexed. Four records are eligible: PostgreSQL
+connectivity, memory pressure, service/DNS connectivity, and object-storage
+authorization. Two unresolved/failed examples demonstrate eligibility rejection.
+
+Indexing is explicit and idempotent:
+
+```sh
+.venv/bin/python -m llm_reasoner.rag index-demo
+.venv/bin/python -m llm_reasoner.rag query \
+  'orders-api PostgreSQL connection failed database unavailable' \
+  --service orders-api
+```
+
+The persistent index defaults to `.rag/chroma`, which is ignored. Set
+`INCIDENT_RAG_PATH` to a different local directory when needed. Retrieval uses
+`all-MiniLM-L6-v2`, cosine similarity, a no-match threshold, optional service
+filtering, and at most five results. An empty match is a successful empty tool
+result. Retrieved records retain `HIST-*` IDs and are labeled verified historical
+incidents; downstream grounding labels them analogies rather than current proof.
+
+The bridge registers this adapter in the existing `retrieve_similar_incidents`
+tool seam. Qwen decides whether to call it and may still call logs/context tools or
+finalize immediately. New resolved incidents are never automatically learned;
+future additions require an explicit curated indexing operation.
 
 ## Configuration
 
@@ -93,8 +127,9 @@ and/or `retrieve_similar_incidents`. Each callable receives `(incident_id, args)
 identity comes from the trusted request, not the model. `args` is the validated
 Pydantic class in tools.py. Return a ToolResult or matching dictionary:
 `{"status": "ok", "evidence": [{"id": "source-id", "text": "verified observation"}]}`.
-Non-success statuses are `unavailable` or `error` and must have no evidence.
-No real adapters or stubs ship in production; stubs exist only in tests.
+Non-success statuses are `unavailable` or `error` and must have no evidence. The
+bridge supplies the existing Docker adapters and verified Chroma adapter; tests
+may inject alternate adapters.
 
 The state holds incident evidence, tool observations, call signatures, pending
 decision, stop reason, and final response. Tool evidence IDs are namespaced by

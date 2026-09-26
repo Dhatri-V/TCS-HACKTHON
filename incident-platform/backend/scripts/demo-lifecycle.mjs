@@ -25,8 +25,12 @@ async function py(code, extra={}) {
   return JSON.parse(r.stdout.trim().split('\n').at(-1));
 }
 let mongo,server,container,stopped=false,watcher,watcherExit;
-const summary={test:'real Docker + real MongoDB + LangGraph + local Qwen',rag:'unavailable; unchanged',checks:[]};
+const summary={test:'real Docker + real MongoDB + LangGraph + local Qwen',rag:'local verified Chroma tool available',checks:[]};
 try {
+  const ragIndex=await exec(python,['-m','llm_reasoner.rag','index-demo'],
+    {cwd:root,env,timeout:600000,maxBuffer:1048576});
+  assert.equal(JSON.parse(ragIndex.stdout.trim().split('\n').at(-1)).indexed,4);
+  summary.checks.push('Curated verified incident knowledge indexed idempotently');
   const snapshot=await py("import json; from llm_reasoner.demo_remediation import DemoDockerAdapter; print(json.dumps(DemoDockerAdapter().snapshot()))");
   assert.equal(snapshot.state,'running');assert.equal(snapshot.health,'healthy');container=snapshot.id;
   const initial=await fetch('http://127.0.0.1:18080/health');assert.equal(initial.status,200);

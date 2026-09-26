@@ -183,6 +183,8 @@ start_demo() {
   }
 
   say 'Starting automatic Docker log watcher and LangGraph/Qwen investigation...'
+  say 'Idempotently indexing the curated verified incident knowledge base...'
+  (cd "$REASONER_DIR" && .venv/bin/python -m llm_reasoner.rag index-demo)
   start_process watcher "$REASONER_DIR" .venv/bin/python -m llm_reasoner.log_watcher \
     --compose-file "$COMPOSE_FILE" --service orders-api --api-base "$API_BASE" --demo
   for _ in {1..30}; do

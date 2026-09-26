@@ -1,0 +1,122 @@
+[
+  {
+    "incident_id": "HIST-DB-001",
+    "timestamp": "2026-06-11T09:20:00Z",
+    "service": "orders-api",
+    "log_level": "error",
+    "message": "PostgreSQL connection failed; orders-api health returned database unavailable and HTTP 503.",
+    "classification": "ERROR",
+    "status": "RESOLVED",
+    "analysis": {
+      "probable_root_cause": "The PostgreSQL service container had stopped, so orders-api could not open database connections."
+    },
+    "remediation": {
+      "state": "RESOLVED",
+      "execution": {"service": "postgres", "status": "succeeded"},
+      "health": {
+        "service": "postgres",
+        "status": "healthy",
+        "details": "PostgreSQL became Docker-healthy and orders-api returned HTTP 200 with database=healthy."
+      },
+      "resolution_summary": "After operator approval, the existing stopped PostgreSQL container was started without recreating it or changing its volume."
+    }
+  },
+  {
+    "incident_id": "HIST-MEM-001",
+    "timestamp": "2026-06-18T14:05:00Z",
+    "service": "report-worker",
+    "log_level": "critical",
+    "message": "Report jobs repeatedly terminated with an out-of-memory container event during large exports.",
+    "classification": "CRITICAL",
+    "status": "RESOLVED",
+    "analysis": {
+      "probable_root_cause": "A newly enabled export path retained complete result sets in memory and exceeded the worker memory limit."
+    },
+    "remediation": {
+      "state": "RESOLVED",
+      "execution": {"service": "report-worker", "status": "succeeded"},
+      "health": {
+        "service": "report-worker",
+        "status": "healthy",
+        "details": "A bounded export completed and memory remained below the verified operating threshold."
+      },
+      "resolution_summary": "The export was changed to stream bounded batches after review, then the worker was restarted and monitored."
+    }
+  },
+  {
+    "incident_id": "HIST-NET-001",
+    "timestamp": "2026-07-02T07:40:00Z",
+    "service": "checkout-api",
+    "log_level": "error",
+    "message": "Checkout requests failed because the service could not resolve the inventory-api hostname.",
+    "classification": "ERROR",
+    "status": "RESOLVED",
+    "analysis": {
+      "probable_root_cause": "A deployment referenced an obsolete internal DNS service name for inventory-api."
+    },
+    "remediation": {
+      "state": "RESOLVED",
+      "execution": {"service": "checkout-api", "status": "succeeded"},
+      "health": {
+        "service": "checkout-api",
+        "status": "healthy",
+        "details": "DNS resolution, inventory connectivity, and checkout synthetic requests all succeeded."
+      },
+      "resolution_summary": "The reviewed deployment configuration was rolled back to the last known valid inventory service name."
+    }
+  },
+  {
+    "incident_id": "HIST-STORAGE-001",
+    "timestamp": "2026-07-15T18:10:00Z",
+    "service": "media-api",
+    "log_level": "error",
+    "message": "Image uploads failed with object storage access denied responses.",
+    "classification": "ERROR",
+    "status": "RESOLVED",
+    "analysis": {
+      "probable_root_cause": "A rotated workload identity was missing the object-write permission for the upload bucket."
+    },
+    "remediation": {
+      "state": "RESOLVED",
+      "execution": {"service": "media-api", "status": "succeeded"},
+      "health": {
+        "service": "media-api",
+        "status": "healthy",
+        "details": "A synthetic image upload and read-back succeeded with the reviewed least-privilege policy."
+      },
+      "resolution_summary": "The missing bucket write permission was added to the reviewed workload policy and verified with a synthetic upload."
+    }
+  },
+  {
+    "incident_id": "HIST-UNVERIFIED-001",
+    "timestamp": "2026-08-01T11:00:00Z",
+    "service": "billing-api",
+    "log_level": "error",
+    "message": "Billing requests intermittently timed out.",
+    "classification": "ERROR",
+    "status": "DIAGNOSED",
+    "analysis": {"probable_root_cause": "The cause remained under investigation."},
+    "remediation": {
+      "state": "BLOCKED",
+      "execution": {"service": "billing-api", "status": "unknown"},
+      "health": {"service": "billing-api", "status": "unknown", "details": "No verified recovery was recorded."},
+      "resolution_summary": "No verified resolution was recorded."
+    }
+  },
+  {
+    "incident_id": "HIST-FAILED-001",
+    "timestamp": "2026-08-03T13:30:00Z",
+    "service": "search-api",
+    "log_level": "critical",
+    "message": "Search index requests failed during a recovery attempt.",
+    "classification": "CRITICAL",
+    "status": "FAILED",
+    "analysis": {"probable_root_cause": "The recovery attempt did not restore service health."},
+    "remediation": {
+      "state": "FAILED",
+      "execution": {"service": "search-api", "status": "failed"},
+      "health": {"service": "search-api", "status": "unhealthy", "details": "Post-change probes continued failing."},
+      "resolution_summary": "The attempted recovery was unsuccessful."
+    }
+  }
+]

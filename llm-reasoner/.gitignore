@@ -19,6 +19,7 @@ htmlcov/
 *.pem
 *.key
 models/
+.rag/
 *.gguf
 *.safetensors
 *.pt

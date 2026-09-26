@@ -16,7 +16,12 @@ dependencies = [
     # Existing architecture pins; these are also LiteLLM transitive dependencies.
     "python-dotenv==1.0.1",
     "requests==2.32.3",
+    "chromadb==1.5.9",
+    "sentence-transformers==6.1.0",
 ]
 
 [tool.setuptools.packages.find]
 include = ["llm_reasoner*"]
+
+[tool.setuptools.package-data]
+llm_reasoner = ["data/*.json"]

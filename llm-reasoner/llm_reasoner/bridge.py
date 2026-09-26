@@ -94,6 +94,7 @@ def incident_to_reasoning_request(incident: dict[str, Any]) -> ReasoningRequest:
 
 
 from .docker_adapters import get_incident_context_adapter, get_logs_adapter
+from .rag import rag_tool_adapter
 
 
 class ToolCallRecord(BaseModel):
@@ -109,12 +110,12 @@ def create_investigation_tools(
     rag_adapter: Callable | None = None,
     use_docker_demo: bool = True,
 ) -> tuple[ToolRegistry, list[ToolCallRecord]]:
-    """Create tool registry with tracking. Unavailable adapters return status='unavailable'."""
+    """Create tracked Docker and Chroma tool adapters for the investigation graph."""
     call_log: list[ToolCallRecord] = []
 
     active_log_adapter = log_adapter or (get_logs_adapter if use_docker_demo else None)
     active_context_adapter = context_adapter or (get_incident_context_adapter if use_docker_demo else None)
-    active_rag_adapter = rag_adapter
+    active_rag_adapter = rag_adapter if rag_adapter is not None else rag_tool_adapter
 
     def get_logs_wrapper(incident_id: str, args):
         record = ToolCallRecord(tool="get_logs", arguments=args.model_dump(), status="unavailable")
