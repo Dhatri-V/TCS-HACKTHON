@@ -21,6 +21,9 @@ from .delivery_outbox import DeliveryOutbox
 from .log_ingestion import IngestionError, incident_from_line, publish_incident
 
 
+PERMANENT_DELIVERY_ERRORS = {'delivery_rejected', 'incident_conflict'}
+
+
 def _publish_with_retry(incident: dict, api_base: str, publisher: Callable,
                         attempts: int, delay_seconds: float, sleeper: Callable) -> str:
     if attempts < 1:
@@ -115,6 +118,9 @@ def watch_docker_logs(
         raise ValueError('compose_file_not_found')
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,99}', service):
         raise ValueError('invalid_service')
+    # Capture the stream watermark before replay so records emitted while a
+    # slow backend/outbox replay is running are still included by Docker.
+    since = datetime.now(timezone.utc).isoformat(timespec='microseconds')
     active_outbox = outbox or DeliveryOutbox()
     diagnosed = 0
     pending, invalid = active_outbox.read_pending()
@@ -124,13 +130,25 @@ def watch_docker_logs(
         try:
             result = pending_processor(incident, api_base=api_base, outbox=active_outbox)
             if result['status'] in {'diagnosed', 'already_processed'}:
+                active_outbox.discard(incident['incident_id'])
                 diagnosed += 1
                 print(json.dumps({'watcher': 'outbox_replayed', **result}), flush=True)
+        except IngestionError as error:
+            code = str(error)
+            if code in PERMANENT_DELIVERY_ERRORS:
+                active_outbox.discard(incident['incident_id'])
+                print(json.dumps({'watcher': 'outbox_discarded',
+                                  'incident_id': incident['incident_id'],
+                                  'code': code}), file=sys.stderr)
+            else:
+                print(json.dumps({'watcher': 'outbox_replay_failed',
+                                  'incident_id': incident['incident_id'],
+                                  'code': code}), file=sys.stderr)
         except Exception:
-            print(json.dumps({'watcher': 'outbox_replay_failed'}), file=sys.stderr)
+            print(json.dumps({'watcher': 'outbox_replay_failed',
+                              'incident_id': incident['incident_id']}), file=sys.stderr)
     if once and diagnosed:
         return diagnosed
-    since = datetime.now(timezone.utc).isoformat(timespec='microseconds')
     command = ['docker', 'compose', '-f', str(compose_path), 'logs', '--follow',
                '--no-log-prefix', '--since', since, service]
     process = popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,

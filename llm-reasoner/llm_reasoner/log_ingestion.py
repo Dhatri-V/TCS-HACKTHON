@@ -19,6 +19,14 @@ class IngestionError(ValueError):
     pass
 
 
+def _delivery_error(status_code: int) -> str:
+    if status_code in {408, 429} or status_code >= 500:
+        return 'delivery_failed'
+    if 400 <= status_code < 500:
+        return 'delivery_rejected'
+    return 'delivery_failed'
+
+
 def incident_from_line(line: str, *, demo: bool = False) -> dict | None:
     if len(line.encode('utf-8')) > 65536:
         raise IngestionError('log_too_large')
@@ -74,10 +82,9 @@ def publish_incident(incident: dict, api_base: str = 'http://localhost:3000') ->
                 fields = ('incident_id', 'timestamp', 'service', 'log_level', 'message', 'classification')
                 if all(value.get(k) == incident[k] for k in fields):
                     return 'already_delivered'
-            raise IngestionError('incident_conflict')
-        if 400 <= response.status_code < 500:
-            raise IngestionError('delivery_rejected')
-        raise IngestionError('delivery_failed')
+                raise IngestionError('incident_conflict')
+            raise IngestionError(_delivery_error(existing.status_code))
+        raise IngestionError(_delivery_error(response.status_code))
     except (requests.RequestException, ValueError) as error:
         if isinstance(error, IngestionError):
             raise

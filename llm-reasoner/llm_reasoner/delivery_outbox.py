@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import tempfile
 
 from .log_ingestion import IngestionError
@@ -19,6 +20,39 @@ FIELDS = {
     'incident_id', 'timestamp', 'service', 'log_level', 'message',
     'classification', 'status', 'analysis',
 }
+
+
+def _secure_owner_directory(path: Path, *, parents: bool = False) -> None:
+    """Create/verify an owner-only real directory, or fail closed."""
+    getuid = getattr(os, 'getuid', None)
+    if getuid is None:
+        raise IngestionError('unsafe_outbox_directory')
+    try:
+        path.mkdir(mode=0o700, parents=parents, exist_ok=True)
+        before = path.lstat()
+        if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+            raise IngestionError('unsafe_outbox_directory')
+        if before.st_uid != getuid():
+            raise IngestionError('unsafe_outbox_directory')
+        path.chmod(0o700)
+        after = path.lstat()
+        if after.st_uid != getuid() or not stat.S_ISDIR(after.st_mode):
+            raise IngestionError('unsafe_outbox_directory')
+        if stat.S_IMODE(after.st_mode) != 0o700:
+            raise IngestionError('unsafe_outbox_directory')
+    except IngestionError:
+        raise
+    except OSError:
+        raise IngestionError('unsafe_outbox_directory') from None
+
+
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0)
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _validated_incident(value: object) -> dict:
@@ -46,16 +80,24 @@ class DeliveryOutbox:
 
     def __init__(self, directory: str | Path | None = None):
         configured = directory or os.getenv('INCIDENT_OUTBOX_DIR')
-        self.directory = Path(configured) if configured else (
-            Path(tempfile.gettempdir()) / 'cloud-incident-copilot' / 'incident-outbox'
-        )
+        self._default_root = None
+        if configured:
+            self.directory = Path(configured)
+        else:
+            getuid = getattr(os, 'getuid', None)
+            if getuid is None:
+                raise IngestionError('unsafe_outbox_directory')
+            self._default_root = (
+                Path(tempfile.gettempdir()) / f'cloud-incident-copilot-{getuid()}'
+            )
+            self.directory = self._default_root / 'incident-outbox'
 
     def _ensure_directory(self) -> None:
-        self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        try:
-            self.directory.chmod(0o700)
-        except OSError:
-            pass
+        if self._default_root is not None:
+            _secure_owner_directory(self._default_root)
+            _secure_owner_directory(self.directory)
+        else:
+            _secure_owner_directory(self.directory, parents=True)
 
     def _path(self, incident_id: str) -> Path:
         if not re.fullmatch(r'(?:INC-DEMO-001|INC-LOG-[a-f0-9]{64})', incident_id):
@@ -74,6 +116,7 @@ class DeliveryOutbox:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, target)
+            _fsync_directory(self.directory)
         except Exception:
             try:
                 os.close(fd)
@@ -86,14 +129,16 @@ class DeliveryOutbox:
             raise
 
     def discard(self, incident_id: str) -> None:
+        self._ensure_directory()
         try:
             self._path(incident_id).unlink()
         except FileNotFoundError:
             pass
+        else:
+            _fsync_directory(self.directory)
 
     def read_pending(self) -> tuple[list[dict], int]:
-        if not self.directory.is_dir():
-            return [], 0
+        self._ensure_directory()
         records, invalid = [], 0
         for path in sorted(self.directory.glob('*.json')):
             try:

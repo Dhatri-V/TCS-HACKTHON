@@ -4,6 +4,31 @@ import IncidentList from "./components/IncidentList.jsx";
 import IncidentDetail from "./components/IncidentDetail.jsx";
 import BackendStatus from "./components/BackendStatus.jsx";
 import { ToastContainer } from "./components/Toast.jsx";
+
+export function createHealthCheckRunner({ load = getHealth, onResult }) {
+  let generation = 0;
+  let controller = null;
+  return {
+    async run() {
+      const current = ++generation;
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      try {
+        const health = await load(request.signal);
+        if (current === generation)
+          onResult(health.status === "healthy" && health.backend === "up");
+      } catch {
+        if (current === generation && !request.signal.aborted) onResult(false);
+      }
+    },
+    stop() {
+      generation += 1;
+      controller?.abort();
+    },
+  };
+}
+
 export default function App() {
   const [incidents, setIncidents] = useState([]),
     [selected, setSelected] = useState(null);
@@ -24,18 +49,10 @@ export default function App() {
     setToasts(items => items.filter(item => item.id !== id));
   }, []);
   useEffect(() => {
-    let active = true;
-    const check = async () => {
-      try {
-        const health = await getHealth();
-        if (active) setBackendOnline(health.status === "healthy" && health.backend === "up");
-      } catch {
-        if (active) setBackendOnline(false);
-      }
-    };
-    check();
-    const timer = setInterval(check, 10000);
-    return () => { active = false; clearInterval(timer); };
+    const healthChecks = createHealthCheckRunner({ onResult: setBackendOnline });
+    healthChecks.run();
+    const timer = setInterval(() => healthChecks.run(), 10000);
+    return () => { clearInterval(timer); healthChecks.stop(); };
   }, []);
   useEffect(() => {
     const controller = new AbortController();
