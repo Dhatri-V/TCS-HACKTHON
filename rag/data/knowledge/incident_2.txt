@@ -1,0 +1,12 @@
+Service: payment-api
+
+Symptoms:
+High latency
+Cache miss rate increased
+Some requests returned 500 errors
+
+Root Cause:
+Redis connection failure
+
+Resolution:
+Restored Redis connectivity and restarted the cache service.
